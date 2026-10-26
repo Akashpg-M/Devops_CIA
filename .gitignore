@@ -1,0 +1,17 @@
+target/
+*.log
+.env
+.idea/
+.vscode/
+*.iml
+.DS_Store
+
+# Python / Ansible
+.venv/
+__pycache__/
+*.pyc
+.retry
+
+# Local Kubernetes credentials
+.kube/
+kubeconfig

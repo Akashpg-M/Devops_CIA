@@ -1,0 +1,11 @@
+.git
+.github
+.idea
+.vscode
+*.iml
+.venv
+__pycache__
+*.pyc
+*.log
+.env
+target/*.original
