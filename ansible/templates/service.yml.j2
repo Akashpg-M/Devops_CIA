@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: azure-cicd-demo
+  namespace: cicd-demo
+  labels:
+    app.kubernetes.io/name: azure-cicd-demo
+spec:
+  type: LoadBalancer
+  selector:
+    app.kubernetes.io/name: azure-cicd-demo
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+      protocol: TCP

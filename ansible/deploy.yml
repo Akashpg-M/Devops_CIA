@@ -1,0 +1,94 @@
+---
+- name: Deploy and verify the CI/CD demo application
+  hosts: localhost
+  connection: local
+  gather_facts: false
+
+  vars:
+    app_namespace: cicd-demo
+    app_name: azure-cicd-demo
+
+  pre_tasks:
+    - name: Validate the container image reference
+      ansible.builtin.assert:
+        that:
+          - image_ref is defined
+          - image_ref | length > 0
+        fail_msg: >-
+          Supply the container image using
+          -e image_ref=REGISTRY.azurecr.io/azure-cicd-demo:TAG
+
+  tasks:
+    - name: Create the application namespace
+      kubernetes.core.k8s:
+        state: present
+        definition:
+          apiVersion: v1
+          kind: Namespace
+          metadata:
+            name: "{{ app_namespace }}"
+
+    - name: Apply the application Deployment
+      kubernetes.core.k8s:
+        state: present
+        resource_definition: >-
+          {{ lookup('template', playbook_dir + '/templates/deployment.yml.j2')
+             | from_yaml }}
+        wait: true
+        wait_condition:
+          type: Available
+          status: "True"
+        wait_timeout: 180
+
+    - name: Apply the application Service
+      kubernetes.core.k8s:
+        state: present
+        resource_definition: >-
+          {{ lookup('template', playbook_dir + '/templates/service.yml.j2')
+             | from_yaml }}
+
+    - name: Retrieve the Deployment status
+      kubernetes.core.k8s_info:
+        api_version: apps/v1
+        kind: Deployment
+        name: "{{ app_name }}"
+        namespace: "{{ app_namespace }}"
+      register: deployment_status
+
+    - name: Verify that the application has a ready replica
+      ansible.builtin.assert:
+        that:
+          - deployment_status.resources | length == 1
+          - >-
+            deployment_status.resources[0].status.readyReplicas
+            | default(0) | int >= 1
+        fail_msg: "The application Deployment has no ready replicas."
+        success_msg: "The application Deployment has a ready replica."
+
+    - name: Retrieve the application Service
+      kubernetes.core.k8s_info:
+        api_version: v1
+        kind: Service
+        name: "{{ app_name }}"
+        namespace: "{{ app_namespace }}"
+      register: service_status
+
+    - name: Verify the Service configuration
+      ansible.builtin.assert:
+        that:
+          - service_status.resources | length == 1
+          - service_status.resources[0].spec.type == "LoadBalancer"
+          - service_status.resources[0].spec.ports[0].port | int == 80
+        fail_msg: "The application Service is not configured correctly."
+        success_msg: "The application Service is configured correctly."
+
+    - name: Display deployment summary
+      ansible.builtin.debug:
+        msg:
+          - "Deployment: {{ app_name }}"
+          - "Namespace: {{ app_namespace }}"
+          - "Image: {{ image_ref }}"
+          - >-
+            Ready replicas:
+            {{ deployment_status.resources[0].status.readyReplicas | default(0) }}
+          - "Service type: LoadBalancer"

@@ -15,3 +15,6 @@ __pycache__/
 # Local Kubernetes credentials
 .kube/
 kubeconfig
+
+# Local Ansible virtual environment
+.venv-ansible/
