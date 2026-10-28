@@ -17,7 +17,7 @@ permissions:
 
 jobs:
   build-and-test:
-    name: Build and Test
+    name: Build, Test, and Deploy
     runs-on: ubuntu-24.04
 
     steps:
@@ -58,3 +58,58 @@ jobs:
         if: github.event_name != 'pull_request'
         run: |
           docker push acrciademo1c5f19.azurecr.io/azure-cicd-demo:${GITHUB_SHA}
+
+      - name: Set up kubectl
+        if: github.event_name != 'pull_request'
+        uses: azure/setup-kubectl@v4
+        with:
+          version: 'latest'
+
+      - name: Configure Kubernetes access
+        if: github.event_name != 'pull_request'
+        env:
+          KUBE_SERVER: ${{ vars.KUBE_SERVER }}
+          KUBE_CA: ${{ vars.KUBE_CA }}
+          KUBE_DEPLOYER_TOKEN: ${{ secrets.KUBE_DEPLOYER_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          test -n "$KUBE_SERVER"
+          test -n "$KUBE_CA"
+          test -n "$KUBE_DEPLOYER_TOKEN"
+
+          printf '%s' "$KUBE_CA" \
+            | base64 --decode > "$RUNNER_TEMP/aks-ca.crt"
+
+          kubectl config set-cluster aks \
+            --server="$KUBE_SERVER" \
+            --certificate-authority="$RUNNER_TEMP/aks-ca.crt"
+
+          kubectl config set-credentials github-deployer \
+            --token="$KUBE_DEPLOYER_TOKEN"
+
+          kubectl config set-context github-deployer-context \
+            --cluster=aks \
+            --user=github-deployer \
+            --namespace=cicd-demo
+
+          kubectl config use-context github-deployer-context
+
+      - name: Deploy to AKS
+        if: github.event_name != 'pull_request'
+        run: |
+          set -euo pipefail
+
+          kubectl set image deployment/azure-cicd-demo \
+            azure-cicd-demo=acrciademo1c5f19.azurecr.io/azure-cicd-demo:${GITHUB_SHA} \
+            -n cicd-demo
+
+          kubectl rollout status deployment/azure-cicd-demo \
+            -n cicd-demo \
+            --timeout=180s
+
+      - name: Verify deployment
+        if: github.event_name != 'pull_request'
+        run: |
+          kubectl get deployment azure-cicd-demo -n cicd-demo
+          kubectl get pods -n cicd-demo
