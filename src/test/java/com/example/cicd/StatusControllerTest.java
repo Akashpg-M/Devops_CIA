@@ -21,7 +21,7 @@ class StatusControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.application")
                         .value("Azure CI/CD Demo"))
-                .andExpect(jsonPath("$.version").value("v1"));
+                .andExpect(jsonPath("$.version").value("v2"));
     }
 
     @Test

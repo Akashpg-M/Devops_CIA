@@ -13,7 +13,7 @@ public class StatusController {
         return Map.of(
             "application", "Azure CI/CD Demo",
             "message", "Deployment successful!",
-            "version", "v1"
+            "version", "v2"
         );
     }
 
